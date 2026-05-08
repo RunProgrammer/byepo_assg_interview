@@ -1,0 +1,87 @@
+version: "3.9"
+
+# Ports:
+#   3000 → Express backend
+#   3001 → Super Admin frontend
+#   3002 → Org Admin frontend
+#   3003 → End User frontend
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: featureflags_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: featureflags
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: featureflags_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/featureflags
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret}
+      JWT_EXPIRES_IN: 7d
+      PORT: 3000
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-admin@byepo.com}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-superadmin123}
+    ports:
+      - "3000:3000"
+
+  frontend-super-admin:
+    build:
+      context: ./frontend-super-admin
+      dockerfile: Dockerfile
+    container_name: featureflags_super_admin
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+    ports:
+      - "3001:3000"
+
+  frontend-org-admin:
+    build:
+      context: ./frontend-org-admin
+      dockerfile: Dockerfile
+    container_name: featureflags_org_admin
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+    ports:
+      - "3002:3000"
+
+  frontend-end-user:
+    build:
+      context: ./frontend-end-user
+      dockerfile: Dockerfile
+    container_name: featureflags_end_user
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+    ports:
+      - "3003:3000"
+
+volumes:
+  postgres_data:

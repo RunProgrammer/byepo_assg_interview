@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ORG_ADMIN
+  END_USER
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users        User[]
+  featureFlags FeatureFlag[]
+
+  @@map("organizations")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role     @default(END_USER)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  orgId          String?        @map("org_id")
+  org            Organization?  @relation(fields: [orgId], references: [id])
+  refreshTokens  RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("refresh_tokens")
+}
+
+model FeatureFlag {
+  id         String   @id @default(uuid())
+  featureKey String   @map("feature_key")
+  isEnabled  Boolean  @default(false) @map("is_enabled")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  orgId String       @map("org_id")
+  org   Organization @relation(fields: [orgId], references: [id])
+
+  @@unique([featureKey, orgId])
+  @@map("feature_flags")
+}
